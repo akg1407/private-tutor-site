@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حجز مدرس خصوصي - باستخدام GPS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            padding: 20px;
+            direction: rtl;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .form-section, .teachers-section {
+            background-color: white;
+            padding: 20px;
+            margin: 20px auto;
+            border-radius: 10px;
+            max-width: 600px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .teacher {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background-color: #e6f7ff;
+        }
+    </style>
+</head>
+<body>
+
+<h1>منصة حجز مدرس خصوصي</h1>
+
+<div class="form-section">
+    <h2>تسجيل بيانات المدرس</h2>
+    <form id="teacherForm">
+        <input type="text" id="name" placeholder="الاسم" required>
+        <input type="text" id="subject" placeholder="التخصص" required>
+        <input type="text" id="location" placeholder="المدينة / الحي" required>
+        <input type="tel" id="phone" placeholder="رقم الجوال" required>
+        <input type="number" id="price" placeholder="سعر الدرس (ريال)" required>
+        <button type="submit">تسجيل المدرس</button>
+    </form>
+</div>
+
+<div class="form-section">
+    <h2>البحث عن أقرب مدرس</h2>
+    <button onclick="findNearestTeachers()">ابحث عن الأقرب</button>
+</div>
+
+<div class="teachers-section">
+    <h2>نتائج البحث</h2>
+    <div id="teacherList"></div>
+</div>
+
+<script>
+    let teachers = JSON.parse(localStorage.getItem('teachers')) || [];
+
+    window.onload = () => {
+        displayTeachers(teachers);
+    };
+
+    document.getElementById('teacherForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                const teacher = {
+                    name: document.getElementById('name').value,
+                    subject: document.getElementById('subject').value,
+                    location: document.getElementById('location').value,
+                    phone: document.getElementById('phone').value,
+                    price: document.getElementById('price').value,
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                };
+                teachers.push(teacher);
+                localStorage.setItem('teachers', JSON.stringify(teachers));
+                alert('تم تسجيل المدرس بنجاح!');
+                displayTeachers(teachers);
+                this.reset();
+            }, () => alert("يجب السماح بالحصول على الموقع"));
+        } else {
+            alert("المتصفح لا يدعم تحديد الموقع");
+        }
+    });
+
+    function findNearestTeachers() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(userPosition => {
+                const userLat = userPosition.coords.latitude;
+                const userLon = userPosition.coords.longitude;
+                const results = teachers.map(t => {
+                    const distance = calcDistance(userLat, userLon, t.latitude, t.longitude);
+                    return {...t, distance: distance};
+                }).sort((a, b) => a.distance - b.distance);
+                displayTeachers(results);
+            }, () => alert("فشل في تحديد موقعك"));
+        } else {
+            alert("المتصفح لا يدعم تحديد الموقع");
+        }
+    }
+
+    function calcDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // نصف قطر الأرض بالكيلومتر
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            0.5 - Math.cos(dLat)/2 + 
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            (1 - Math.cos(dLon))/2;
+
+        return R * 2 * Math.asin(Math.sqrt(a));
+    }
+
+    function displayTeachers(list) {
+        const container = document.getElementById('teacherList');
+        container.innerHTML = '';
+        if (list.length === 0) {
+            container.innerHTML = '<p>لا يوجد مدرسين.</p>';
+            return;
+        }
+        list.forEach((t, index) => {
+            container.innerHTML += `
+                <div class="teacher">
+                    <strong>الاسم:</strong> ${t.name}<br>
+                    <strong>التخصص:</strong> ${t.subject}<br>
+                    <strong>الموقع:</strong> ${t.location}<br>
+                    <strong>رقم الجوال:</strong> ${t.phone}<br>
+                    <strong>السعر:</strong> ${t.price} ريال<br>
+                    ${t.distance !== undefined ? `<strong>المسافة:</strong> ${t.distance.toFixed(2)} كم<br>` : ''}
+                    <button onclick="deleteTeacher(${index})">حذف</button>
+                </div>
+            `;
+        });
+    }
+
+    function deleteTeacher(index) {
+        if (confirm('هل أنت متأكد من حذف هذا المدرس؟')) {
+            teachers.splice(index, 1);
+            localStorage.setItem('teachers', JSON.stringify(teachers));
+            displayTeachers(teachers);
+        }
+    }
+</script>
+
+</body>
+</html>
